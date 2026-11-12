@@ -1,0 +1,10 @@
+# Thresholds for turn-taking labels; pass with `annotate --config interactions.example.toml`.
+# Defaults are starting points: tune them against a hand-labelled sample of your calls.
+[interactions]
+ipu_gap_s = 0.5               # silence that splits one speaker's words into separate IPUs
+simultaneous_start_s = 0.2    # both speakers starting this close together = simultaneous_start
+terminal_overlap_s = 0.6      # starting this close to the other speaker's end = overlap_turn_end
+backchannel_max_s = 1.2       # backchannels are at most this long...
+backchannel_max_words = 3     # ...and have at most this many words
+backchannel_resume_s = 2.0    # a backchannel in a pause needs the floor holder to resume within this
+# backchannel_lexicon = ["yeah", "mm-hmm", "okay", "haan", "ji", "achha"]
