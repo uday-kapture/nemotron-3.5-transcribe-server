@@ -29,9 +29,14 @@ from .client import PROMPTS, ClientConfig, build_request, find_audio
 
 
 def summarize(rows: list[dict], duration_s: float) -> dict:
-    """Throughput and latency of the requests that finished in the second half of a level."""
+    """Throughput and latency of the requests that finished in the second half of a level.
+
+    Truncation and CTC failures count every finished request: runaway generations finish long after
+    the window, so a window-only count would hide them while they hold batch slots.
+    """
     half = duration_s / 2
     ok = [r for r in rows if r["ok"] and half <= r["finished_at"] <= duration_s]
+    finished = [r for r in rows if r["ok"]]
     latencies = sorted(r["latency_s"] for r in ok)
 
     def pct(q: float) -> float:
@@ -40,8 +45,8 @@ def summarize(rows: list[dict], duration_s: float) -> dict:
     return {
         "ok": len(ok),
         "errors": sum(not r["ok"] for r in rows),
-        "truncated": sum(r["finish_reason"] == "length" for r in ok),
-        "ctc_errors": sum(r["ctc_error"] is not None for r in ok),
+        "truncated": sum(r["finish_reason"] == "length" for r in finished),
+        "ctc_errors": sum(r["ctc_error"] is not None for r in finished),
         "calls_per_hour": len(ok) / half * 3600,
         "rtfx": sum(r["audio_s"] for r in ok) / half,
         "out_tok_s": sum(r["completion_tokens"] for r in ok) / half,
@@ -130,6 +135,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=ClientConfig.model)
     parser.add_argument("--pass", dest="pass_name", default="speaker", choices=PROMPTS, help="prompt to send")
     parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=4096,
+        help="completion cap; a runaway (looping) generation otherwise holds a batch slot for ~6 min at 24576",
+    )
+    parser.add_argument(
         "--concurrency",
         default="1,8,32,64,128,192,256",
         type=lambda s: [int(c) for c in s.split(",")],
@@ -145,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     files = find_audio(args.audio.resolve())
     if not files:
         parser.error(f"no audio files found under {args.audio}")
-    config = ClientConfig(server_url=args.server, model=args.model)
+    config = ClientConfig(server_url=args.server, model=args.model, max_tokens=args.max_tokens)
     # Encode every request once up front so client-side base64/JSON work can't throttle the test.
     # shortcut: soundfile can't read .m4a durations; convert first if you load-test m4a.
     calls = [
