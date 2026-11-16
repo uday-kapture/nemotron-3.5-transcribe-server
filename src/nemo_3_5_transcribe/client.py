@@ -31,6 +31,11 @@ _BASE_PROMPT = (
 # Prompts from the model card's prompt recommendations.
 PROMPTS = {
     "speaker": _BASE_PROMPT + "Put speaker tags <spk:0> <spk:1> <spk:2> <spk:3> on the transcription.",
+    # Hindi/English calls: names the scripts instead of leaving the language to the model. Untested
+    # combination (the card documents script control and speaker tags separately); compare against "speaker".
+    "speaker_hi": _BASE_PROMPT
+    + "Write Hindi in Devanagari and English words in Latin script. "
+    + "Put speaker tags <spk:0> <spk:1> <spk:2> <spk:3> on the transcription.",
     "rich": _BASE_PROMPT
     + "Use <ev:*> and <sty:*> special tokens to recognize all non-speech verbatims and speaking style.",
 }
