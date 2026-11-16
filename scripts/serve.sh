@@ -25,6 +25,12 @@ export VLLM_USE_V2_MODEL_RUNNER=0
 # Audio limit: one recording of up to 1 h per request, which is all the client sends (as in the
 # FP8 card); the base card's 6 x ~2 h reserves profiling memory that could be cache.
 
+# MTP_TOKENS=0 turns speculative decoding off (the card does that by dropping the flag).
+SPEC=()
+if [[ $MTP_TOKENS -gt 0 ]]; then
+  SPEC=(--speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":$MTP_TOKENS}")
+fi
+
 exec vllm serve "$MODEL_DIR" \
   --host "$HOST" --port "$PORT" \
   --served-model-name nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B \
@@ -34,7 +40,7 @@ exec vllm serve "$MODEL_DIR" \
   --use-replayssm --mamba-backend flashinfer --mamba-cache-mode none \
   --mm-processor-cache-gb 0 --no-async-scheduling \
   --limit-mm-per-prompt '{"audio":{"count":1,"length":57600000}}' \
-  --speculative-config "{\"method\":\"mtp\",\"num_speculative_tokens\":$MTP_TOKENS}" \
+  ${SPEC[@]+"${SPEC[@]}"} \
   --reasoning-parser nemotron_v3 \
   --trust-request-mm-kwargs \
   --middleware nemo.collections.speechlm2.vllm.salm.ctc_serving.ctc_timestamp_middleware \

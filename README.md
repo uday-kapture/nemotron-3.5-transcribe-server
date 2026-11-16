@@ -63,6 +63,21 @@ uv run nemo-3-5-transcribe annotate --out out/ --config interactions.example.tom
 Supported inputs: `.wav .flac .mp3 .ogg .opus .m4a`, up to 1 hour and 180 MB each (server limits).
 `--passes speaker` skips the rich pass.
 
+## Load testing
+
+`serve.sh` defaults target an H100. On an H200, start from `MAX_NUM_SEQS=384 MAX_BATCHED_TOKENS=8192`
+(`MTP_TOKENS` sets speculative tokens; 0 turns MTP off), then measure capacity with real calls:
+
+```bash
+uvx --from huggingface_hub hf download kapturecx/audited-transcripts-multispeaker \
+    --repo-type dataset --include 'audio/raw/*.wav' --local-dir data/audited
+uv run python -m nemo_3_5_transcribe.loadtest data/audited/audio/raw --server http://gpu-host:8000 --max-p95 60
+```
+
+It sweeps in-flight request counts (`--concurrency 1,8,32,...`) for `--duration` seconds each and prints
+calls/hour, RTFx and latency percentiles per level, plus the busiest level within the `--max-p95` target.
+Run it on or near the GPU host: each request uploads the whole recording.
+
 ## Outputs
 
 | Path | One row per | Use |
