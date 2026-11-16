@@ -12,3 +12,6 @@ wheels/
 # Pipeline outputs and model weights
 out/
 NVIDIA-Nemotron-3.5-Transcribe-*/
+
+# Downloaded audio (private customer calls)
+data/
