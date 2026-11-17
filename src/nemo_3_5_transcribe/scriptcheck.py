@@ -15,6 +15,7 @@ import argparse
 import asyncio
 import itertools
 import json
+import re
 import sys
 import time
 import unicodedata
@@ -34,6 +35,7 @@ ALL_PROMPTS = PROMPTS | {
     ),
 }
 EXPECTED_SCRIPTS = {"DEVANAGARI", "LATIN"}
+LOW_DEVANAGARI = 0.3  # below this share of Devanagari letters, a Hindi call's transcript is in the wrong language
 
 
 def _script(char: str) -> str:
@@ -43,6 +45,21 @@ def _script(char: str) -> str:
 def foreign_scripts(text: str) -> Counter:
     """Letters outside Devanagari/Latin, counted by script name (``CJK``, ``ARABIC``, ...)."""
     return Counter(s for c in text if c.isalpha() and (s := _script(c)) not in EXPECTED_SCRIPTS)
+
+
+def devanagari_share(text: str) -> float | None:
+    """Fraction of letters (tags like <spk:0> excluded) that are Devanagari; None if there are no letters.
+
+    Catches wrong *language* in an expected script (English or romanized text for a Hindi call): the
+    reviewed transcripts of all 71 calls are at least 63% Devanagari, the English failures seen are 0%.
+    """
+    letters = [c for c in re.sub(r"<[^>]*>", "", text) if c.isalpha()]
+    return sum(_script(c) == "DEVANAGARI" for c in letters) / len(letters) if letters else None
+
+
+def is_wrong_language(row: dict) -> bool:
+    share = row.get("deva")
+    return bool(row.get("foreign")) or (share is not None and share < LOW_DEVANAGARI)
 
 
 def snippet(text: str) -> str:
@@ -83,6 +100,7 @@ async def run(args: argparse.Namespace) -> list[dict]:
                     try:
                         row |= await send(http, json.dumps(body).encode())
                         row["foreign"] = dict(foreign_scripts(row["text"]))
+                        row["deva"] = devanagari_share(row["text"])
                     except Exception as error:  # one failed request must not stop the sweep
                         row |= {"error": repr(error)}
                 rows.append(row)
@@ -98,22 +116,27 @@ def report(rows: list[dict], examples: int) -> None:
     groups: dict[tuple, list[dict]] = defaultdict(list)
     for r in rows:
         groups[(r["prompt"], r["temperature"])].append(r)
-    print(f"\n{'prompt':<10} {'temp':>5} {'runs':>5} {'foreign':>8} {'CJK':>5} {'trunc':>6} {'errors':>7}")
+    print(
+        f"\n{'prompt':<10} {'temp':>5} {'runs':>5} {'foreign':>8} {'CJK':>5} {'lowdeva':>8} {'trunc':>6} {'errors':>7}"
+    )
     for (prompt, temperature), rs in sorted(groups.items()):
         ok = [r for r in rs if "error" not in r]
         print(
             f"{prompt:<10} {temperature:>5} {len(rs):>5} {sum(bool(r['foreign']) for r in ok):>8} "
-            f"{sum('CJK' in r['foreign'] for r in ok):>5} {sum(r['finish_reason'] == 'length' for r in ok):>6} "
-            f"{len(rs) - len(ok):>7}"
+            f"{sum('CJK' in r['foreign'] for r in ok):>5} "
+            f"{sum(r['deva'] is not None and r['deva'] < LOW_DEVANAGARI for r in ok):>8} "
+            f"{sum(r['finish_reason'] == 'length' for r in ok):>6} {len(rs) - len(ok):>7}"
         )
-    bad = [r for r in rows if r.get("foreign")]
+    print("foreign = letters outside Devanagari/Latin; lowdeva = under 30% Devanagari (English/romanized for Hindi)")
+    bad = [r for r in rows if is_wrong_language(r)]
     for r in bad[:examples]:
-        print(f"\n{r['call']} [{r['prompt']} t={r['temperature']} seed={r['seed']}] {r['foreign']}")
+        deva = "n/a" if r["deva"] is None else f"{r['deva']:.0%}"
+        print(f"\n{r['call']} [{r['prompt']} t={r['temperature']} seed={r['seed']}] devanagari={deva} {r['foreign']}")
         print(f"  ...{snippet(r['text'])}...")
     if len(bad) > examples:
         print(f"\n(+{len(bad) - examples} more in the log)")
     if not bad:
-        print("\nNo letters outside Devanagari/Latin in any response: not reproduced with these settings.")
+        print("\nNo wrong-language responses with these settings: not reproduced.")
 
 
 def main(argv: list[str] | None = None) -> int:
