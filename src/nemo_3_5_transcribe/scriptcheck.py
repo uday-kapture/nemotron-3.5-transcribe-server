@@ -29,6 +29,18 @@ from .loadtest import send
 
 ALL_PROMPTS = PROMPTS | {
     "plain": "Transcribe the following audio.",
+    # The card's Monsoon Hindi prompt: stronger script control than speaker_hi, but no speaker tags.
+    "hindi_strict": (
+        "Audio transcription. Language: as spoken. Wording: verbatim, including fillers and repetitions. "
+        "Formatting: punctuation and capitalization. Output: transcript only. "
+        "Use Devanagari for Hindi words, never romanized Hindi. Keep English words in their original spelling."
+    ),
+    # The card's experimental near-field prompt: ignores background voices, so no tags for them either.
+    "nearfield": (
+        "Transcribe this audio. Include all spoken words and verbal fillers. Write numbers as spoken. "
+        "No punctuation or capitalization. Transcribe only the speaker nearest to the microphone. "
+        "Do not transcribe any other voices."
+    ),
     "verbatim": (
         "Audio transcription. Language: as spoken. Wording: verbatim, including fillers and repetitions. "
         "Formatting: punctuation and capitalization. Output: transcript only."
