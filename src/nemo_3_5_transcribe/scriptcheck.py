@@ -35,6 +35,14 @@ ALL_PROMPTS = PROMPTS | {
         "Formatting: punctuation and capitalization. Output: transcript only. "
         "Use Devanagari for Hindi words, never romanized Hindi. Keep English words in their original spelling."
     ),
+    # speaker_hi with hindi_strict's script wording, so the output keeps speaker tags. Untested combination.
+    "speaker_strict": (
+        "Transcribe this audio with punctuation and capitalization. "
+        "Include all spoken words and verbal fillers. "
+        "Write numbers in their standard written form. "
+        "Use Devanagari for Hindi words, never romanized Hindi. Keep English words in their original spelling. "
+        "Put speaker tags <spk:0> <spk:1> <spk:2> <spk:3> on the transcription."
+    ),
     # The card's experimental near-field prompt: ignores background voices, so no tags for them either.
     "nearfield": (
         "Transcribe this audio. Include all spoken words and verbal fillers. Write numbers as spoken. "
